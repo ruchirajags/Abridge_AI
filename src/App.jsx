@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import Landing from './components/Landing.jsx';
 
 import Header from './components/Header.jsx';
 import Sidebar from './components/Sidebar.jsx';
@@ -29,7 +30,7 @@ import { slugify } from './utils/scaffold.js';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 export default function App() {
-  const [view, setView] = useState('overview');
+  const [view, setView] = useState('landing');
   const [theme, setTheme] = useState(() => readTheme() || getSystemTheme());
   const [history, setHistory] = useState(() => readHistory());
   const [activeId, setActiveId] = useState(null);
@@ -226,6 +227,10 @@ export default function App() {
     }
   };
 
+  const handleEnterFromLanding = () => {
+    setView('overview');
+  };
+
   const handleExport = () => {
     if (!currentProject) return;
     downloadFile(
@@ -250,6 +255,10 @@ export default function App() {
   // ── Status line ──────────────────────────────────────────────
   const statusText = running ? 'running pipeline…' : pipelineState === 'complete' ? `complete · ${currentProject?.time || ''}` : 'idle';
   const statusState = running ? 'running' : pipelineState === 'complete' ? 'done' : 'idle';
+
+  if (view === 'landing') {
+    return <Landing onEnter={handleEnterFromLanding} />;
+  }
 
   return (
     <div className="shell">
