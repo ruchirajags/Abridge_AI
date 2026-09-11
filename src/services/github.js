@@ -37,6 +37,37 @@ function summarizeRepos(repos) {
     }));
 }
 
+// ── Built-in last-resort fallback ─────────────────────────────────────────────
+// This mirrors public/data/sample-github-analysis.json exactly. It is only used
+// when that file cannot be fetched (e.g. network fully offline, file missing).
+// Keep the two in sync: any change to the JSON file should also update this object.
+const BUILTIN_SAMPLE_RAW = {
+  profile: {
+    login: 'octocat', name: 'The Octocat',
+    bio: 'Curious cat. Builder of small, useful things.',
+    location: 'San Francisco, CA', company: '@github', blog: null,
+    public_repos: 8, followers: 20124, following: 9,
+    html_url: 'https://github.com/octocat', created_at: '2011-01-25T18:44:36Z',
+  },
+  repos: [
+    { name: 'Hello-World',     description: 'My first repository on GitHub!',                         language: 'TypeScript', stargazers_count: 2621 },
+    { name: 'Spoon-Knife',     description: 'This repo is for demonstration purposes only.',          language: 'JavaScript', stargazers_count: 12802 },
+    { name: 'github-bot',      description: 'A small bot that triages issues with labels.',           language: 'TypeScript', stargazers_count: 341 },
+    { name: 'notes-to-actions',description: 'CLI that turns meeting notes into action items.',        language: 'Python',     stargazers_count: 187 },
+    { name: 'rail-scheduler',  description: 'Priority-queue based scheduler for web workers.',        language: 'TypeScript', stargazers_count: 96 },
+    { name: 'weather-cli',     description: 'Weather forecasts in your terminal, no API key needed.', language: 'Go',         stargazers_count: 74 },
+    { name: 'spellcheck-rs',   description: 'Fast fuzzy spell checker with a tiny footprint.',        language: 'Rust',       stargazers_count: 213 },
+  ],
+};
+
+// Pre-parsed so we don't repeat the transform logic in the catch block.
+const BUILTIN_SAMPLE = {
+  source: 'sample',
+  profile: parseGitHubProfile(BUILTIN_SAMPLE_RAW.profile),
+  languages: tallyLanguages(BUILTIN_SAMPLE_RAW.repos),
+  repos: summarizeRepos(BUILTIN_SAMPLE_RAW.repos),
+};
+
 async function loadSampleGitHub() {
   try {
     const res = await fetch('/data/sample-github-analysis.json');
@@ -49,22 +80,8 @@ async function loadSampleGitHub() {
       repos: summarizeRepos(data.repos),
     };
   } catch {
-    return {
-      source: 'sample',
-      profile: {
-        login: 'octocat', name: 'The Octocat', bio: 'Curious cat.',
-        location: null, company: null, blog: null,
-        publicRepos: 8, followers: 20124, following: 9, htmlUrl: null, createdAt: null,
-      },
-      languages: [
-        { language: 'TypeScript', count: 3 },
-        { language: 'JavaScript', count: 1 },
-        { language: 'Python', count: 1 },
-        { language: 'Go', count: 1 },
-        { language: 'Rust', count: 1 },
-      ],
-      repos: [],
-    };
+    // JSON file unavailable — fall back to the built-in copy of the same data.
+    return BUILTIN_SAMPLE;
   }
 }
 

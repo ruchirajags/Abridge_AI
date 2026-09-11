@@ -23,6 +23,7 @@ import { runBriefAgent } from './agents/briefAgent.js';
 import {
   readHistory, saveToHistory, deleteFromHistory, clearHistory,
   readDraft, clearDraft, readTheme, writeTheme, getSystemTheme,
+  RECORD_VERSION,
 } from './utils/storage.js';
 import { buildBriefMarkdown, downloadFile } from './utils/export.js';
 import { slugify } from './utils/scaffold.js';
@@ -131,9 +132,10 @@ export default function App() {
       // 7. Brief (replaces AO Task Agent)
       setStep('brief', 'running');
       await sleep(800);
-      const briefText = runBriefAgent({
+      const brief = runBriefAgent({
         name: input.name, idea: input.idea, deadline: input.deadline, comfort: input.comfort,
         stack: input.stack, customStack: input.customStack, type: input.type, team: input.team,
+        audience: input.audience, github: input.github,
         githubFirstLine: ghText.split('\n')[0],
         feasLine: `${feas.score}/100 — ${feas.verdict}`,
         builderLine: `${builder.files.length} files — download the scaffold (.zip)`,
@@ -152,13 +154,14 @@ export default function App() {
         architecture: archText,
         stack: stackText,
         builder,
-        brief: briefText,
+        brief,
       };
       setResults(newResults);
 
       // Save to history
       if (input.idea) {
         const record = {
+          version: RECORD_VERSION,
           id: Date.now().toString(36),
           name: input.name, stack: input.stack, customStack: input.customStack,
           github: input.github, idea: input.idea, deadline: input.deadline,
@@ -195,16 +198,9 @@ export default function App() {
       return;
     }
 
-    // Re-derive feasibility deterministically (ensures axes always present)
-    const feas = runFeasibilityAgent(item);
-    const results = {
-      ...item.outputs,
-      feasibility: item.outputs.feasibility
-        ? { ...item.outputs.feasibility, axes: item.outputs.feasibility.axes || feas.axes }
-        : feas,
-    };
-
-    setResults(results);
+    // normalize() in readHistory has already ensured the record is in the
+    // current schema (e.g. feasibility.axes is present). No agent re-run needed.
+    setResults(item.outputs);
     setStatuses({ github: 'done', research: 'done', feasibility: 'done', architecture: 'done', stack: 'done', builder: 'done', brief: 'done' });
     setPipelineState('complete');
     setView('overview');
@@ -347,7 +343,7 @@ export default function App() {
                     <OutputCard index={5} title="Tech Stack Recommendation" agent="stack"
                       body={results.stack} copyable={results.stack} onToast={showToast} />
                     <BuilderCard builder={results.builder} onToast={showToast} />
-                    <BriefCard briefText={results.brief} onToast={showToast} />
+                    <BriefCard brief={results.brief} onToast={showToast} />
                   </div>
                 </section>
               )}

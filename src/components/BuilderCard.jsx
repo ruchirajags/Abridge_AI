@@ -10,26 +10,17 @@ export default function BuilderCard({ builder, onToast }) {
   };
 
   return (
-    <article className="card" data-agent="builder">
-      <div className="card-head">
-        <div className="card-title">
-          <span className="card-index">06</span>
-          <span>Builder Plan &amp; Starter Scaffold</span>
-        </div>
-        <div className="card-head-actions">
-          <button type="button" className="card-copy" onClick={() => {
-            navigator.clipboard?.writeText(builder.text).then(() => onToast('Copied to clipboard.')).catch(() => onToast('Could not copy.'));
-          }}>
-            Copy
-          </button>
-          <button type="button" className="card-download" onClick={handleDownload}>
-            Download scaffold (.zip)
-          </button>
-        </div>
-      </div>
-      <div className="card-body">
-        <pre>{builder.text}</pre>
-      </div>
-    </article>
+    <OutputCard
+      index={6}
+      title="Builder Plan &amp; Starter Scaffold"
+      agent="builder"
+      copyable={builder.text}
+      body={builder.text}
+      onToast={onToast}
+    >
+      <button type="button" className="card-download" onClick={handleDownload}>
+        Download scaffold (.zip)
+      </button>
+    </OutputCard>
   );
 }

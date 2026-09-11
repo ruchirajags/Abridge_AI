@@ -1,48 +1,32 @@
-import { useState } from 'react';
+import OutputCard from './OutputCard.jsx';
 
-export default function BriefCard({ briefText, onToast }) {
-  const [copied, setCopied] = useState(false);
-  if (!briefText) return null;
+export default function BriefCard({ brief, briefText, onToast }) {
+  // Accept either the new structured object (brief) or the legacy string prop (briefText).
+  // briefText kept for any call sites that haven't been updated yet.
+  const resolved = brief ?? briefText;
+  if (!resolved) return null;
 
-  const handleCopy = () => {
-    if (navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(briefText)
-        .then(() => { onToast('Implementation plan copied.'); setCopied(true); setTimeout(() => setCopied(false), 1400); })
-        .catch(() => onToast('Could not copy.'));
-    }
-  };
+  // Structured object from briefAgent; legacy history records pass a plain string.
+  const text = (typeof resolved === 'object' && resolved !== null)
+    ? resolved.text
+    : resolved;
 
   return (
-    <article className="card" data-agent="brief">
-      <div className="card-head">
-        <div className="card-title">
-          <span className="card-index">07</span>
-          <span>Implementation Plan</span>
-        </div>
-        <div className="card-head-actions">
-          <button
-            type="button"
-            className={`card-copy${copied ? ' is-copied' : ''}`}
-            onClick={handleCopy}
-            aria-label="Copy implementation plan"
-          >
-            {copied ? 'Copied!' : 'Copy'}
-          </button>
-        </div>
+    <OutputCard
+      index={7}
+      title="Implementation Plan"
+      agent="brief"
+      copyable={text}
+      onToast={onToast}
+    >
+      <div className="prompt-wrap">
+        <textarea
+          id="impl-plan"
+          readOnly
+          value={text}
+          aria-label="Implementation plan text"
+        />
       </div>
-      <div className="card-body">
-        <div className="prompt-wrap">
-          <textarea
-            id="impl-plan"
-            readOnly
-            value={briefText}
-            aria-label="Implementation plan text"
-          />
-          <button type="button" className="copy-btn" onClick={handleCopy}>
-            Copy plan
-          </button>
-        </div>
-      </div>
-    </article>
+    </OutputCard>
   );
 }

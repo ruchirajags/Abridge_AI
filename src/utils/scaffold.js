@@ -1,94 +1,10 @@
-// CRC-32 table (lazy-initialized)
-let CRC_TABLE = null;
+import { zipSync, strToU8 } from 'fflate';
 
-function buildCrcTable() {
-  CRC_TABLE = new Int32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    CRC_TABLE[n] = c;
-  }
-}
-
-function crc32(bytes) {
-  if (!CRC_TABLE) buildCrcTable();
-  let crc = -1;
-  for (let i = 0; i < bytes.length; i++) {
-    crc = (crc >>> 8) ^ CRC_TABLE[(crc ^ bytes[i]) & 0xff];
-  }
-  return (crc ^ -1) >>> 0;
-}
-
-// Build a store-only ZIP in the browser — no dependencies
+// Build a store-only ZIP in the browser using fflate.
 export function buildZip(files) {
-  const enc = new TextEncoder();
-  const localChunks = [];
-  const central = [];
-  let offset = 0;
-  const DOS_TIME = 0;
-  const DOS_DATE = 0x5821;
-
-  files.forEach(f => {
-    const nameBytes = enc.encode(f.path);
-    const dataBytes = enc.encode(f.content);
-    const crc = crc32(dataBytes);
-    const local = new Uint8Array(30 + nameBytes.length + dataBytes.length);
-    const v = new DataView(local.buffer);
-    v.setUint32(0, 0x04034b50, true);
-    v.setUint16(4, 20, true);
-    v.setUint16(6, 0x0800, true);
-    v.setUint16(8, 0, true);
-    v.setUint16(10, DOS_TIME, true);
-    v.setUint16(12, DOS_DATE, true);
-    v.setUint32(14, crc, true);
-    v.setUint32(18, dataBytes.length, true);
-    v.setUint32(22, dataBytes.length, true);
-    v.setUint16(26, nameBytes.length, true);
-    v.setUint16(28, 0, true);
-    local.set(nameBytes, 30);
-    local.set(dataBytes, 30 + nameBytes.length);
-    localChunks.push(local);
-    central.push({ nameBytes, crc, size: dataBytes.length, offset });
-    offset += local.length;
-  });
-
-  const centralChunks = [];
-  const centralStart = offset;
-  central.forEach(c => {
-    const hdr = new Uint8Array(46 + c.nameBytes.length);
-    const v = new DataView(hdr.buffer);
-    v.setUint32(0, 0x02014b50, true);
-    v.setUint16(4, 20, true); v.setUint16(6, 20, true);
-    v.setUint16(8, 0x0800, true);
-    v.setUint16(10, 0, true);
-    v.setUint16(12, DOS_TIME, true); v.setUint16(14, DOS_DATE, true);
-    v.setUint32(16, c.crc, true);
-    v.setUint32(20, c.size, true); v.setUint32(24, c.size, true);
-    v.setUint16(28, c.nameBytes.length, true);
-    v.setUint16(30, 0, true); v.setUint16(32, 0, true);
-    v.setUint16(34, 0, true); v.setUint16(36, 0, true);
-    v.setUint32(38, 0, true); v.setUint32(42, c.offset, true);
-    hdr.set(c.nameBytes, 46);
-    centralChunks.push(hdr);
-  });
-
-  const centralSize = centralChunks.reduce((s, c) => s + c.length, 0);
-  const eocd = new Uint8Array(22);
-  const ev = new DataView(eocd.buffer);
-  ev.setUint32(0, 0x06054b50, true);
-  ev.setUint16(4, 0, true); ev.setUint16(6, 0, true);
-  ev.setUint16(8, files.length, true); ev.setUint16(10, files.length, true);
-  ev.setUint32(12, centralSize, true);
-  ev.setUint32(16, centralStart, true);
-  ev.setUint16(20, 0, true);
-
-  const total = centralStart + centralSize + eocd.length;
-  const out = new Uint8Array(total);
-  let pos = 0;
-  localChunks.forEach(c => { out.set(c, pos); pos += c.length; });
-  centralChunks.forEach(c => { out.set(c, pos); pos += c.length; });
-  out.set(eocd, pos);
-  return out;
+  const input = {};
+  files.forEach(f => { input[f.path] = [strToU8(f.content), { level: 0 }]; });
+  return zipSync(input);
 }
 
 export function downloadZip(files, name) {

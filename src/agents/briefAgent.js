@@ -5,6 +5,28 @@ export function runBriefAgent(ctx) {
   const projectType = PROJECT_TYPES[ctx.type] || ctx.type || 'Not specified';
   const teamSize = TEAM_SIZES[ctx.team] || ctx.team || 'Solo';
 
+  const nextSteps = [
+    'Review the feasibility score and adjust scope if needed.',
+    'Download the starter scaffold and unzip it locally.',
+    'Run the build/test commands to confirm the scaffold works.',
+    'Implement the core logic in the core module first.',
+    'Add a unit test for every module before moving on.',
+    'Follow the milestone plan: Foundation → Core slice → Harden → Ship.',
+    'Export this project brief and keep it as your reference document.',
+  ];
+
+  const mvpGuidance = [
+    'Build the minimum that proves the core idea works end-to-end.',
+    'Defer all "nice-to-have" features until the core is working.',
+    'Prefer working software over comprehensive documentation.',
+    'Commit working code every day — never let a session end with broken code.',
+  ];
+
+  const footer = [
+    'This plan was generated deterministically from your project inputs.',
+    'It is a starting point — adapt it to your specific situation.',
+  ];
+
   const lines = [
     'IMPLEMENTATION PLAN',
     '===================',
@@ -23,23 +45,35 @@ export function runBriefAgent(ctx) {
     `  Project type    : ${projectType} · Team: ${teamSize}`,
     '',
     '── Suggested next steps ─────────────────────────',
-    '  1. Review the feasibility score and adjust scope if needed.',
-    '  2. Download the starter scaffold and unzip it locally.',
-    '  3. Run the build/test commands to confirm the scaffold works.',
-    '  4. Implement the core logic in the core module first.',
-    '  5. Add a unit test for every module before moving on.',
-    '  6. Follow the milestone plan: Foundation → Core slice → Harden → Ship.',
-    '  7. Export this project brief and keep it as your reference document.',
+    ...nextSteps.map((s, i) => `  ${i + 1}. ${s}`),
     '',
     '── MVP scope guidance ───────────────────────────',
-    '  • Build the minimum that proves the core idea works end-to-end.',
-    '  • Defer all "nice-to-have" features until the core is working.',
-    '  • Prefer working software over comprehensive documentation.',
-    '  • Commit working code every day — never let a session end with broken code.',
+    ...mvpGuidance.map(s => `  • ${s}`),
     '',
-    '> This plan was generated deterministically from your project inputs.',
-    '> It is a starting point — adapt it to your specific situation.',
+    ...footer.map(s => `> ${s}`),
   ];
 
-  return lines.join('\n');
+  const text = lines.join('\n');
+
+  return {
+    text,
+    projectName: ctx.name || 'the builder',
+    ownerName:   ctx.name || 'the builder',
+    idea:        ctx.idea,
+    stackLabel,
+    projectType,
+    teamSize,
+    audience:               ctx.audience  || '',
+    github:                 ctx.github    || '',
+    deadline:               ctx.deadline  || '',
+    comfort:                ctx.comfort   || '',
+    githubFirstLine:        ctx.githubFirstLine,
+    feasLine:               ctx.feasLine,
+    builderLine:            ctx.builderLine,
+    architectureFirstLine:  ctx.architectureFirstLine,
+    researchFirstLine:      ctx.researchFirstLine,
+    nextSteps,
+    mvpGuidance,
+    footer,
+  };
 }
