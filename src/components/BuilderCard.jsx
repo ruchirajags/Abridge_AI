@@ -1,5 +1,5 @@
 import OutputCard from './OutputCard.jsx';
-import { downloadZip } from '../utils/scaffold.js';
+import { downloadZip } from '../utils/zip.js';
 
 export default function BuilderCard({ builder, onToast }) {
   if (!builder) return null;

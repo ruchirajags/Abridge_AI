@@ -51,5 +51,6 @@ export function runArchitectureAgent(input) {
     '  Adapt this blueprint to your specific domain. The module names are',
     '  starting points — rename them to match your project language.',
   ];
-  return lines.join('\n');
+
+  return { shape: flow, modules, flow, principles, text: lines.join('\n') };
 }

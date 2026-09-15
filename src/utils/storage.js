@@ -33,6 +33,15 @@ export function normalize(record) {
     if (outputs.brief && typeof outputs.brief === 'string') {
       outputs = { ...outputs, brief: { text: outputs.brief } };
     }
+
+    // structured-IO migration: research/architecture/stack were stored as plain
+    // text before the agents returned { ..., text }; wrap so consumers can
+    // always read `.text`.
+    ['research', 'architecture', 'stack'].forEach(k => {
+      if (outputs[k] && typeof outputs[k] === 'string') {
+        outputs = { ...outputs, [k]: { text: outputs[k] } };
+      }
+    });
   }
 
   return { ...record, version: Math.max(version, RECORD_VERSION), outputs };
