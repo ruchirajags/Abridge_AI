@@ -1,5 +1,5 @@
-import { STACKS } from '../utils/export.js';
-import { slugify, scaffoldFiles, getScaffoldTree, filePurpose } from '../utils/scaffold.js';
+import { STACKS } from '../domain/stacks.js';
+import { slugify, scaffoldFiles, getScaffoldTree, filePurpose } from '../scaffold/scaffold.js';
 
 const MILESTONES = [
   { week: 1, title: 'Foundation',  tasks: ['Scaffold the repo from the starter files.', 'Wire build, test, and lint scripts.', 'Add fixtures for the first input sample.'], accept: 'the repo builds and the placeholder test passes.' },

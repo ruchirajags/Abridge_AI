@@ -1,3 +1,10 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const SAMPLE_PATH = path.resolve(__dirname, '../../../public/data/sample-github-analysis.json');
+
 function parseGitHubProfile(profile) {
   return {
     login: profile.login || 'unknown',
@@ -38,9 +45,8 @@ function summarizeRepos(repos) {
 }
 
 // ── Built-in last-resort fallback ─────────────────────────────────────────────
-// This mirrors public/data/sample-github-analysis.json exactly. It is only used
-// when that file cannot be fetched (e.g. network fully offline, file missing).
-// Keep the two in sync: any change to the JSON file should also update this object.
+// Mirrors public/data/sample-github-analysis.json. Only used when the file
+// cannot be read (unlikely in Node) — kept for resilience.
 const BUILTIN_SAMPLE_RAW = {
   profile: {
     login: 'octocat', name: 'The Octocat',
@@ -60,19 +66,10 @@ const BUILTIN_SAMPLE_RAW = {
   ],
 };
 
-// Pre-parsed so we don't repeat the transform logic in the catch block.
-const BUILTIN_SAMPLE = {
-  source: 'sample',
-  profile: parseGitHubProfile(BUILTIN_SAMPLE_RAW.profile),
-  languages: tallyLanguages(BUILTIN_SAMPLE_RAW.repos),
-  repos: summarizeRepos(BUILTIN_SAMPLE_RAW.repos),
-};
-
-async function loadSampleGitHub() {
+function loadSampleGitHub() {
   try {
-    const res = await fetch('/data/sample-github-analysis.json');
-    if (!res.ok) throw new Error('sample fetch failed');
-    const data = await res.json();
+    const raw = fs.readFileSync(SAMPLE_PATH, 'utf8');
+    const data = JSON.parse(raw);
     return {
       source: 'sample',
       profile: parseGitHubProfile(data.profile),
@@ -80,14 +77,21 @@ async function loadSampleGitHub() {
       repos: summarizeRepos(data.repos),
     };
   } catch {
-    // JSON file unavailable — fall back to the built-in copy of the same data.
-    return BUILTIN_SAMPLE;
+    const data = BUILTIN_SAMPLE_RAW;
+    return {
+      source: 'sample',
+      profile: parseGitHubProfile(data.profile),
+      languages: tallyLanguages(data.repos),
+      repos: summarizeRepos(data.repos),
+    };
   }
 }
 
 export async function fetchGitHub(username) {
   const user = String(username || '').trim().replace(/^@/, '');
   if (!user) return loadSampleGitHub();
+
+  if (typeof fetch !== 'function') return loadSampleGitHub();
   try {
     const profileRes = await fetch(`https://api.github.com/users/${encodeURIComponent(user)}`);
     if (!profileRes.ok) throw new Error(`GitHub profile status ${profileRes.status}`);
