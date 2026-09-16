@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { writeDraft } from '../utils/storage.js';
 
 const EXAMPLE = {
@@ -24,18 +24,22 @@ function debounce(fn, ms) {
   return (...args) => { clearTimeout(t); t = setTimeout(() => fn(...args), ms); };
 }
 
+// Auto-save draft on every change (stable debounced fn shared across renders)
+const saveDraft = debounce(writeDraft, 350);
+
 export default function ProjectForm({ onSubmit, initialData, onBack, running, onToast }) {
   const [form, setForm] = useState({ ...EMPTY, ...(initialData || {}) });
   const [hint, setHint] = useState('');
+  const [prevInitial, setPrevInitial] = useState(initialData);
 
-  // Auto-save draft on every change
-  const saveDraft = useCallback(debounce(writeDraft, 350), []);
-  useEffect(() => { saveDraft(form); }, [form, saveDraft]);
+  useEffect(() => { saveDraft(form); }, [form]);
 
-  // Restore from prop when parent restores a project
-  useEffect(() => {
+  // Restore from prop when the parent restores a project, without re-running
+  // the draft autosave effect below it.
+  if (initialData !== prevInitial) {
+    setPrevInitial(initialData);
     if (initialData) setForm({ ...EMPTY, ...initialData });
-  }, [initialData]);
+  }
 
   const set = (field, value) => setForm(prev => ({ ...prev, [field]: value }));
 
@@ -184,7 +188,8 @@ export default function ProjectForm({ onSubmit, initialData, onBack, running, on
           {hint && <span className="form-hint" id="form-hint">{hint}</span>}
         </div>
         <p className="form-note">
-          AbridgeAI runs a deterministic planning pipeline entirely in your browser. Nothing leaves your device.
+          AbridgeAI runs a deterministic planning pipeline on the local backend — Logic is executed
+          server-side, then results are returned to this dashboard.
           <br />Press <kbd>Ctrl+Enter</kbd> to run.
         </p>
       </form>

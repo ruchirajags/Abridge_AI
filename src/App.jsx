@@ -11,24 +11,16 @@ import BuilderCard from './components/BuilderCard.jsx';
 import BriefCard from './components/BriefCard.jsx';
 import Toast from './components/Toast.jsx';
 
-import { fetchGitHub } from './services/github.js';
-import { runGitHubAgent } from './agents/githubAgent.js';
-import { runResearchAgent } from './agents/researchAgent.js';
-import { runFeasibilityAgent } from './agents/feasibilityAgent.js';
-import { runArchitectureAgent } from './agents/architectureAgent.js';
-import { runTechStackAgent } from './agents/techStackAgent.js';
-import { runBuilderAgent } from './agents/builderAgent.js';
-import { runBriefAgent } from './agents/briefAgent.js';
+import { runPlan, exportBrief } from './api/client.js';
 
 import {
   readHistory, saveToHistory, deleteFromHistory, clearHistory,
   readDraft, clearDraft, readTheme, writeTheme, getSystemTheme,
   RECORD_VERSION,
 } from './utils/storage.js';
-import { buildBriefMarkdown, downloadFile } from './utils/export.js';
-import { slugify } from './utils/scaffold.js';
+import { downloadFile } from './utils/export.js';
 
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+const STAGE_KEYS = ['github', 'research', 'feasibility', 'architecture', 'stack', 'builder', 'brief'];
 
 export default function App() {
   const [view, setView] = useState('landing');
@@ -59,8 +51,18 @@ export default function App() {
     if (!window.matchMedia) return;
     const mql = window.matchMedia('(prefers-color-scheme: dark)');
     const handler = e => { if (!readTheme()) setTheme(e.matches ? 'dark' : 'light'); };
-    mql.addEventListener ? mql.addEventListener('change', handler) : mql.addListener?.(handler);
-    return () => mql.removeEventListener ? mql.removeEventListener('change', handler) : mql.removeListener?.(handler);
+    if (mql.addEventListener) {
+      mql.addEventListener('change', handler);
+    } else if (mql.addListener) {
+      mql.addListener(handler);
+    }
+    return () => {
+      if (mql.removeEventListener) {
+        mql.removeEventListener('change', handler);
+      } else if (mql.removeListener) {
+        mql.removeListener(handler);
+      }
+    };
   }, []);
 
   const showToast = useCallback(msg => setToast(msg), []);
@@ -71,17 +73,13 @@ export default function App() {
     showToast(next === 'dark' ? 'Dark theme on.' : 'Light theme on.');
   };
 
-  const setStep = (step, state) => {
-    setStatuses(prev => ({ ...prev, [step]: state }));
-  };
-
   const resetPipeline = () => {
     setStatuses({});
     setResults(null);
     setPipelineState('standby');
   };
 
-  // ── Pipeline runner ─────────────────────────────────────────
+  // ── Pipeline runner (orchestrated by the backend) ───────────
   const runPipeline = async (input) => {
     if (running) return;
     setRunning(true);
@@ -91,71 +89,13 @@ export default function App() {
     setView('overview');
 
     try {
-      // 1. GitHub
-      setStep('github', 'running');
-      const gh = await fetchGitHub(input.github);
-      await sleep(650);
-      const ghText = runGitHubAgent(gh);
-      const ghBadge = gh.source === 'live' ? 'live · github.com' : 'sample data';
-      setStep('github', 'done');
+      const { results: newResults } = await runPlan(input);
 
-      // 2. Research
-      setStep('research', 'running');
-      await sleep(900);
-      const researchText = runResearchAgent(input, gh);
-      setStep('research', 'done');
-
-      // 3. Feasibility
-      setStep('feasibility', 'running');
-      await sleep(800);
-      const feas = runFeasibilityAgent(input);
-      setStep('feasibility', 'done');
-
-      // 4. Architecture
-      setStep('architecture', 'running');
-      await sleep(900);
-      const archText = runArchitectureAgent(input);
-      setStep('architecture', 'done');
-
-      // 5. Tech stack
-      setStep('stack', 'running');
-      await sleep(800);
-      const stackText = runTechStackAgent(input);
-      setStep('stack', 'done');
-
-      // 6. Builder
-      setStep('builder', 'running');
-      await sleep(900);
-      const builder = runBuilderAgent(input);
-      setStep('builder', 'done');
-
-      // 7. Brief (replaces AO Task Agent)
-      setStep('brief', 'running');
-      await sleep(800);
-      const brief = runBriefAgent({
-        name: input.name, idea: input.idea, deadline: input.deadline, comfort: input.comfort,
-        stack: input.stack, customStack: input.customStack, type: input.type, team: input.team,
-        audience: input.audience, github: input.github,
-        githubFirstLine: ghText.split('\n')[0],
-        feasLine: `${feas.score}/100 — ${feas.verdict}`,
-        builderLine: `${builder.files.length} files — download the scaffold (.zip)`,
-        stackLabel: input.customStack || input.stack,
-        architectureFirstLine: archText.split('\n')[0],
-        researchFirstLine: researchText.split('\n')[0],
+      // Reveal completed stages in order so the timeline reads naturally.
+      STAGE_KEYS.forEach((key, i) => {
+        setTimeout(() => setStatuses(prev => ({ ...prev, [key]: 'done' })), i * 140);
       });
-      setStep('brief', 'done');
-
       setPipelineState('complete');
-
-      const newResults = {
-        github: { text: ghText, badge: ghBadge },
-        research: researchText,
-        feasibility: feas,
-        architecture: archText,
-        stack: stackText,
-        builder,
-        brief,
-      };
       setResults(newResults);
 
       // Save to history
@@ -227,13 +167,16 @@ export default function App() {
     setView('overview');
   };
 
-  const handleExport = () => {
+  const handleExport = async () => {
     if (!currentProject) return;
-    downloadFile(
-      slugify(currentProject.name || currentProject.idea) + '-abridgeai-brief.md',
-      buildBriefMarkdown(currentProject),
-    );
-    showToast('Project brief exported.');
+    try {
+      const { filename, markdown } = await exportBrief(currentProject);
+      downloadFile(filename, markdown);
+      showToast('Project brief exported.');
+    } catch (err) {
+      console.error(err);
+      showToast('Export failed — is the backend running?');
+    }
   };
 
   // ── Metrics (derived from history) ─────────────────────────
@@ -336,12 +279,12 @@ export default function App() {
                       body={results.github.text} badge={results.github.badge}
                       copyable={results.github.text} onToast={showToast} />
                     <OutputCard index={2} title="Research & Opportunity Analysis" agent="research"
-                      body={results.research} copyable={results.research} onToast={showToast} />
+                      body={results.research?.text ?? results.research} copyable={results.research?.text ?? results.research} onToast={showToast} />
                     <FeasibilityCard feasibility={results.feasibility} onToast={showToast} />
                     <OutputCard index={4} title="Architecture Direction" agent="architecture"
-                      body={results.architecture} copyable={results.architecture} onToast={showToast} />
+                      body={results.architecture?.text ?? results.architecture} copyable={results.architecture?.text ?? results.architecture} onToast={showToast} />
                     <OutputCard index={5} title="Tech Stack Recommendation" agent="stack"
-                      body={results.stack} copyable={results.stack} onToast={showToast} />
+                      body={results.stack?.text ?? results.stack} copyable={results.stack?.text ?? results.stack} onToast={showToast} />
                     <BuilderCard builder={results.builder} onToast={showToast} />
                     <BriefCard brief={results.brief} onToast={showToast} />
                   </div>

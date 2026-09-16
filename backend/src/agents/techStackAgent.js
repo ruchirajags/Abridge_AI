@@ -1,4 +1,4 @@
-import { STACKS } from '../utils/export.js';
+import { STACKS } from '../domain/stacks.js';
 
 export function runTechStackAgent(input) {
   const hasCustomStack = !!input.customStack;
@@ -26,7 +26,7 @@ export function runTechStackAgent(input) {
       'Note: The starter scaffold uses TypeScript defaults for file structure.',
       '      Adapt the scaffold files to match your custom stack.',
     ];
-    return lines.join('\n');
+    return { label: input.customStack, custom: true, pace: comfortNote, text: lines.join('\n') };
   }
 
   const key = input.stack || 'unsure';
@@ -44,5 +44,6 @@ export function runTechStackAgent(input) {
     `Why: ${s.why}`,
     `Pace (${comfort}): ${comfortNote}`,
   ];
-  return lines.join('\n');
+
+  return { label: s.label, app: s.app, ui: s.ui, api: s.api, data: s.data, test: s.test, lint: s.lint, why: s.why, pace: comfortNote, text: lines.join('\n') };
 }

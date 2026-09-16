@@ -1,29 +1,40 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { getMeta } from '../api/client.js';
 
-const STEP_LABELS = {
-  github:       'Builder Signals',
-  research:     'Research & Opportunities',
-  feasibility:  'Feasibility Assessment',
-  architecture: 'Architecture Direction',
-  stack:        'Tech Stack',
-  builder:      'Builder Plan & Scaffold',
-  brief:        'Project Brief',
-};
-
-const NEXT_LABELS = {
-  github:       'Research & opportunity scan — market signals, risks, and recommended direction.',
-  research:     'Feasibility score — a /100 verdict with effort estimate and risk register.',
-  feasibility:  'Architecture direction — module breakdown and data-flow blueprint.',
-  architecture: 'Tech stack recommendation matched to your comfort level.',
-  stack:        'Builder plan — starter scaffold with file tree and milestone checklist.',
-  builder:      'Project brief — your complete implementation plan ready to follow.',
-  brief:        'Planning complete — download the scaffold or export the project brief.',
-};
+// Static fallback so the timeline renders even if the backend is down.
+// When /api/meta responds, these are replaced with the backend's single
+// source of truth (pipeline/stages.js).
+const FALLBACK_STAGES = [
+  { key: 'github', label: 'Builder Signals', nextHint: 'Research & opportunity scan — market signals, risks, and recommended direction.' },
+  { key: 'research', label: 'Research & Opportunities', nextHint: 'Feasibility score — a /100 verdict with effort estimate and risk register.' },
+  { key: 'feasibility', label: 'Feasibility Assessment', nextHint: 'Architecture direction — module breakdown and data-flow blueprint.' },
+  { key: 'architecture', label: 'Architecture Direction', nextHint: 'Tech stack recommendation matched to your comfort level.' },
+  { key: 'stack', label: 'Tech Stack', nextHint: 'Builder plan — starter scaffold with file tree and milestone checklist.' },
+  { key: 'builder', label: 'Builder Plan & Scaffold', nextHint: 'Project brief — your complete implementation plan ready to follow.' },
+  { key: 'brief', label: 'Project Brief', nextHint: 'Planning complete — download the scaffold or export the project brief.' },
+];
 
 export default function Pipeline({ statuses, feasibility, pipelineState }) {
-  const steps = ['github', 'research', 'feasibility', 'architecture', 'stack', 'builder', 'brief'];
+  const [stages, setStages] = useState(FALLBACK_STAGES);
+  const [hints, setHints] = useState(
+    Object.fromEntries(FALLBACK_STAGES.map(s => [s.key, s.nextHint])),
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    getMeta()
+      .then(meta => {
+        if (!mounted || !meta?.stages?.length) return;
+        setStages(meta.stages);
+        setHints(Object.fromEntries(meta.stages.map(s => [s.key, s.nextHint])));
+      })
+      .catch(() => { /* keep static fallback */ });
+    return () => { mounted = false; };
+  }, []);
+
+  const steps = stages.map(s => s.key);
   const lastDone = [...steps].reverse().find(s => statuses[s] === 'done');
-  const nextLabel = lastDone ? NEXT_LABELS[lastDone] : 'Add an idea and run the pipeline to get started.';
+  const nextLabel = lastDone ? hints[lastDone] : 'Add an idea and run the pipeline to get started.';
 
   return (
     <div className="pipeline-panel">
@@ -35,10 +46,10 @@ export default function Pipeline({ statuses, feasibility, pipelineState }) {
           </span>
         </h2>
         <ol className="timeline" id="pipeline">
-          {steps.map(step => {
-            const state = statuses[step] || 'queued';
+          {stages.map(stage => {
+            const state = statuses[stage.key] || 'queued';
             return (
-              <li key={step} className={`tl-row${state === 'running' ? ' is-running' : state === 'done' ? ' is-done' : ''}`} data-step={step}>
+              <li key={stage.key} className={`tl-row${state === 'running' ? ' is-running' : state === 'done' ? ' is-done' : ''}`} data-step={stage.key}>
                 <span className="tl-node">
                   <svg viewBox="0 0 12 12" aria-hidden="true">
                     <path d="M2 6l3 3 5-6" stroke="currentColor" strokeWidth="1.6" fill="none" strokeLinecap="round" strokeLinejoin="round" />
@@ -49,7 +60,7 @@ export default function Pipeline({ statuses, feasibility, pipelineState }) {
                     </svg>
                   )}
                 </span>
-                <span className="tl-name">{STEP_LABELS[step]}</span>
+                <span className="tl-name">{stage.label}</span>
                 <span className="tl-status">
                   {state === 'running' ? 'in progress' : state === 'done' ? 'completed' : 'pending'}
                 </span>

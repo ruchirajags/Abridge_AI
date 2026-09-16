@@ -1,21 +1,3 @@
-import { zipSync, strToU8 } from 'fflate';
-
-// Build a store-only ZIP in the browser using fflate.
-export function buildZip(files) {
-  const input = {};
-  files.forEach(f => { input[f.path] = [strToU8(f.content), { level: 0 }]; });
-  return zipSync(input);
-}
-
-export function downloadZip(files, name) {
-  const blob = new Blob([buildZip(files)], { type: 'application/zip' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = name;
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
 export function slugify(str) {
   return String(str || 'project').toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -187,7 +169,6 @@ function rustStarter(slug, name, desc) {
 }
 
 export function scaffoldFiles(input, slug) {
-  const stackKey = input.customStack ? 'custom' : (input.stack || 'unsure');
   const name = input.name || slug;
   const desc = input.idea || 'A deterministic tool.';
   const planFile = { path: 'PLAN.md', content: planMarkdown(input, slug) };
